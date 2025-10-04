@@ -128,9 +128,10 @@ class Meteoalert(object):
         elif location:
             # TODO
             # first get polygon data
+            polygon_coords = entry.get('cap:polygon')
             # next check if location is in polygon
-            return False
-
+            if  Polygon(polygon_coords).contains(location):
+                return True
         return False
 
 
