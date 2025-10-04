@@ -3,6 +3,7 @@ import sys
 import xmltodict
 import requests
 import re
+from shapely.geometry import Point, Polygon
 
 class WrongCountry(Exception):
     pass
@@ -13,14 +14,25 @@ class ServerError(Exception):
 class UnexpectedError(Exception):
     pass
 
+class MissingArguments(Exception):
+    pass
+
 class Meteoalert(object):
 
     endpoint = "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-{0}"
 
-    def __init__(self, country, province, language='en-GB'):
+    def __init__(self, country, province=None, latitude=None, longitude=None, language='en-GB'):
         self.country = country.lower()
         self.province = province
         self.language = language
+        if (longitude and not latitude) or ( not latitude and longitude):
+            raise MissingArguments("Both Longitude and Latitude must be given")
+        if longitude and latitude:
+            self.location = Point(longitude, latitude)
+        else:
+            self.location = None
+        if not self.province and not self.location:
+            raise MissingArguments("Give either province or longitude and latitude")
 
     def get_alert(self):
         """Retrieve alert data"""
@@ -45,7 +57,7 @@ class Meteoalert(object):
         feed = feed_data.get('feed', [])
         entries = feed.get('entry', [])
         for entry in (entries if type(entries) is list else [entries]):
-            if not self.is_location_match(entry, self.province):
+            if not self.is_location_match(entry, province=self.province, location=self.location):
                 continue
 
             # Get the cap URL for additional alert data
@@ -103,15 +115,21 @@ class Meteoalert(object):
             break
         return data
 
-    def is_location_match(self, entry, province):
-        # Attempt to match the province first by regex on name
-        if re.search(rf"{self.province}", entry.get('cap:areaDesc'), re.IGNORECASE):
-            return True
-
-        # then by areaCode
-        elif entry.get('cap:geocode') and entry.get('cap:geocode')['value']:
-            if entry.get('cap:geocode')['value'] == province:
+    def is_location_match(self, entry, province=None, location=None):
+        if province:
+            # Attempt to match the province first by regex on name
+            if re.search(rf"{self.province}", entry.get('cap:areaDesc'), re.IGNORECASE):
                 return True
+    
+            # then by areaCode
+            elif entry.get('cap:geocode') and entry.get('cap:geocode')['value']:
+                if entry.get('cap:geocode')['value'] == province:
+                    return True
+        elif location:
+            # TODO
+            # first get polygon data
+            # next check if location is in polygon
+            return False
 
         return False
 
