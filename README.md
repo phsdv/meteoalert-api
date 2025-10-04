@@ -1,3 +1,6 @@
+# Fork
+Fork to try adding polygon support
+
 # meteoalarm-api
 
 
